@@ -1,5 +1,5 @@
 const { sendPushNotification } = require('../services/notificationService');
-const { db } = require('../config/firebase');
+const { db, admin } = require('../config/firebase');
 
 const sendBroadcast = async (req, res) => {
     try {
@@ -23,10 +23,21 @@ const sendBroadcast = async (req, res) => {
         let sentCount = 0;
         const promises = snapshot.docs.map(async (doc) => {
             const userId = doc.id;
-            // Send individually for now (notificationService handles tokens internally per user)
-            // This might be slow for massive users, but fine for this scale.
-            // Ideally notificationService should accept array of tokens, but it takes userId.
+
+            // 1. Send Push Notification
             await sendPushNotification(userId, title, body, { url: '/dashboard' });
+
+            // 2. Store in Firestore for persistence
+            await db.collection('notifications').add({
+                userId: userId,
+                title: title,
+                body: body,
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                type: 'broadcast',
+                url: '/dashboard'
+            });
+
             sentCount++;
         });
 
