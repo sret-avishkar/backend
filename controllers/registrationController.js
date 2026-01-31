@@ -3,7 +3,7 @@ const { uploadToGitHub } = require('../services/githubService');
 
 const registerForEvent = async (req, res) => {
     try {
-        const { userId, eventId, mobile, email, name, college, rollNo, department, paymentScreenshotUrl, paperUrl, status } = req.body;
+        const { userId, eventId, mobile, email, name, college, rollNo, department, paymentScreenshotUrl, paperUrl, status, payLater } = req.body;
 
         if (!userId || !eventId || !mobile) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -86,8 +86,21 @@ const registerForEvent = async (req, res) => {
             paperUrl: finalPaperUrl,
             status: initialStatus,
             paperStatus: initialPaperStatus,
+            payLater: payLater || false, // Save payLater flag
             timestamp: new Date()
         });
+
+        // Update User Profile with Mobile Number if provided
+        if (mobile && userId) {
+            try {
+                await db.collection('users').doc(userId).set({
+                    mobileNumber: mobile
+                }, { merge: true });
+            } catch (userUpdateError) {
+                console.error("Failed to update user mobile number:", userUpdateError);
+                // Non-critical error, continue
+            }
+        }
 
         // --- Send Notification to Organizer AND Admin ---
         try {

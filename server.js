@@ -22,6 +22,19 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
 
+// Security Middleware: Block direct browser access
+app.use('/api', (req, res, next) => {
+    // Allow preflight checks (OPTIONS) to pass (handled by cors, but good practice)
+    if (req.method === 'OPTIONS') return next();
+
+    const clientAppHeader = req.headers['x-client-app'];
+    if (clientAppHeader === 'Avishkar-Web') {
+        next();
+    } else {
+        res.status(403).json({ error: 'Access Denied: Direct API access is restricted.' });
+    }
+});
+
 // Routes
 app.use('/api/upload', require('./routes/uploadRoutes'));
 // app.use('/api/auth', require('./routes/authRoutes'));

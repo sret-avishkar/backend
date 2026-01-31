@@ -2,22 +2,53 @@ const { auth, db } = require('../config/firebase');
 
 const users = [
     {
-        email: 'admin@avishkar.com',
-        password: 'password123',
-        displayName: 'Admin User',
-        role: 'admin'
+        email: 'avishkar2026.eee@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'T. Kosaleswara Reddy',
+        role: 'organizer',
+        mobileNumber: '9949266787'
     },
     {
-        email: 'organizer@avishkar.com',
-        password: 'password123',
-        displayName: 'Event Organizer',
-        role: 'organizer'
+        email: 'avishkar2026.me@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'K. Ramesh Kumar',
+        role: 'organizer',
+        mobileNumber: '9494503639'
     },
     {
-        email: 'student@avishkar.com',
-        password: 'password123',
-        displayName: 'Student Participant',
-        role: 'participant'
+        email: 'avishkar2026.ece@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'S. Sruthi',
+        role: 'organizer',
+        mobileNumber: '7989532664'
+    },
+    {
+        email: 'avishkar2026.cse@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'Y. Ravi Kumar',
+        role: 'organizer',
+        mobileNumber: '9666908272'
+    },
+    {
+        email: 'avishkar2026.aids@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'MR. Pavan Kumar',
+        role: 'organizer',
+        mobileNumber: '9652916364'
+    },
+    {
+        email: 'avishkar2026.mba@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'M.S. Vasu',
+        role: 'organizer',
+        mobileNumber: '7330692733'
+    },
+    {
+        email: 'avishkar2026.bsh@sreerama.ac.in',
+        password: 'Avishkar@2026',
+        displayName: 'V. Sravan Kumar',
+        role: 'organizer',
+        mobileNumber: '9030804427'
     }
 ];
 

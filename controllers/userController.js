@@ -99,7 +99,8 @@ const getUserById = async (req, res) => {
             email: userData.email || '', // Maybe hide email if privacy concern? But user requested it.
             mobileNumber: userData.mobileNumber || '',
             upiId: userData.upiId || '',
-            role: userData.role || 'participant'
+            role: userData.role || 'participant',
+            paymentQrCodeUrl: userData.paymentQrCodeUrl || ''
         };
 
         res.status(200).json(publicProfile);

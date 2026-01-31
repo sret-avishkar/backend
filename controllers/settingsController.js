@@ -7,7 +7,8 @@ const getSettings = async (req, res) => {
             // Return defaults if not set
             return res.status(200).json({
                 registrationDeadline: new Date('2026-12-31').toISOString(),
-                departments: ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AI&DS', 'MBA', 'MCA', 'Others']
+                departments: ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AI&DS', 'MBA', 'MCA', 'Others'],
+                paymentQrCodeUrl: ''
             });
         }
         // Ensure departments exist even if doc exists
@@ -24,12 +25,13 @@ const getSettings = async (req, res) => {
 
 const updateSettings = async (req, res) => {
     try {
-        const { registrationDeadline, departments } = req.body;
+        const { registrationDeadline, departments, paymentQrCodeUrl } = req.body;
         console.log("Updating Settings with:", { registrationDeadline, departmentsCount: departments?.length, departments });
 
         const updateData = {};
         if (registrationDeadline !== undefined) updateData.registrationDeadline = registrationDeadline;
         if (departments !== undefined) updateData.departments = departments;
+        if (paymentQrCodeUrl !== undefined) updateData.paymentQrCodeUrl = paymentQrCodeUrl;
 
         await db.collection('settings').doc('global').set(updateData, { merge: true });
         res.status(200).json({ message: 'Settings updated successfully' });
