@@ -24,8 +24,11 @@ app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
 
 // Security Middleware: Block direct browser access
 app.use('/api', (req, res, next) => {
-    // Allow preflight checks (OPTIONS) to pass (handled by cors, but good practice)
+    // Allow preflight checks
     if (req.method === 'OPTIONS') return next();
+
+    // Allow Health Check / Keep-Alive Endpoint
+    if (req.path === '/health') return next();
 
     const clientAppHeader = req.headers['x-client-app'];
     if (clientAppHeader === 'Avishkar-Web') {
@@ -36,6 +39,9 @@ app.use('/api', (req, res, next) => {
 });
 
 // Routes
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'active', timestamp: new Date() });
+});
 app.use('/api/upload', require('./routes/uploadRoutes'));
 // app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
