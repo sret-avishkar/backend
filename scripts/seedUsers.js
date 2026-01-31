@@ -82,6 +82,7 @@ const seedUsers = async () => {
                 email: user.email,
                 displayName: user.displayName,
                 role: user.role,
+                mobileNumber: user.mobileNumber || '',
                 createdAt: new Date(),
                 uid: userRecord.uid
             }, { merge: true });
