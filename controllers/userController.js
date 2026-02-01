@@ -17,6 +17,17 @@ const getAllUsers = async (req, res) => {
         // If roles are in Firestore, we should fetch them. 
         // Let's try to fetch roles from Firestore 'users' collection
 
+        // Fetch Registration Counts
+        const registrationsSnapshot = await db.collection('registrations').get();
+        const registrationCounts = {};
+        registrationsSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.userId) {
+                registrationCounts[data.userId] = (registrationCounts[data.userId] || 0) + 1;
+            }
+        });
+
+        // Fetch Firestore User Data
         const usersSnapshot = await db.collection('users').get();
         const firestoreUsers = {};
         usersSnapshot.forEach(doc => {
@@ -26,7 +37,8 @@ const getAllUsers = async (req, res) => {
         const combinedUsers = users.map(user => ({
             ...user,
             ...firestoreUsers[user.uid], // Merge Firestore data (role, etc.)
-            role: firestoreUsers[user.uid]?.role || 'participant'
+            role: firestoreUsers[user.uid]?.role || 'participant',
+            registrationCount: registrationCounts[user.uid] || 0 // Add Registration Count
         }));
 
         res.status(200).json(combinedUsers);
