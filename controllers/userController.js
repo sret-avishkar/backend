@@ -66,11 +66,23 @@ const updateUserRole = async (req, res) => {
         });
 
         // Send Notification
-        const isApproved = role === 'organizer';
-        const notifTitle = isApproved ? "Organizer Request Approved" : "Organizer Request Rejected";
-        const notifBody = isApproved
-            ? "Your request for Organizer access has been APPROVED. You can now access the Organizer Dashboard."
-            : "Your request for Organizer access has been REJECTED.";
+        let notifTitle = "Role Updated";
+        let notifBody = `Your role has been updated to ${role}.`;
+
+        if (role === 'organizer') {
+            notifTitle = "Organizer Request Approved";
+            notifBody = "Your request for Organizer access has been APPROVED. You can now access the Organizer Dashboard.";
+        } else if (role === 'coordinator') {
+            notifTitle = "Coordinator Access Granted";
+            notifBody = "You have been assigned as a Coordinator. You can now access the Coordinator Dashboard.";
+        } else if (role === 'participant') {
+            // If demoted or rejected
+            // We might want to be careful here, but for now generic is fine or keep legacy behavior if needed
+            // preserving legacy "rejected" logic if it was a rejection flow, but this function is generic update...
+            // Let's keep it simple.
+            notifTitle = "Role Updated";
+            notifBody = "Your role has been updated to Participant.";
+        }
 
         await db.collection('notifications').add({
             userId: uid,

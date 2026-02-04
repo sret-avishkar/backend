@@ -63,7 +63,7 @@ const getEvents = async (req, res) => {
         const { role, organizerId } = req.query;
         let query = db.collection('events');
 
-        if (role !== 'admin') {
+        if (role !== 'admin' && role !== 'coordinator') {
             if (organizerId) {
                 const snapshot = await query.get();
                 let events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
