@@ -144,10 +144,17 @@ const deleteUser = async (req, res) => {
         // Delete from Firestore
         await db.collection('users').doc(uid).delete();
 
-        // Optionally delete related registrations? 
-        // For now, keeping it simple as per request.
+        // Delete related registrations
+        const registrationsSnapshot = await db.collection('registrations').where('userId', '==', uid).get();
+        if (!registrationsSnapshot.empty) {
+            const batch = db.batch();
+            registrationsSnapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
 
-        res.status(200).json({ message: 'User deleted successfully' });
+        res.status(200).json({ message: 'User and associated registrations deleted successfully' });
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ error: 'Failed to delete user' });

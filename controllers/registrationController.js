@@ -142,6 +142,7 @@ const registerForEvent = async (req, res) => {
             // 2. Notify ALL Admins
             const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
             if (!adminSnapshot.empty) {
+                const adminUrl = `/admin/events/${eventId}/participants`; // Specific URL for admins
                 const adminPromises = adminSnapshot.docs.map(async (doc) => {
                     const adminId = doc.id;
                     // Avoid duplicate notification if admin is same as organizer
@@ -157,12 +158,12 @@ const registerForEvent = async (req, res) => {
                         type: 'new_registration',
                         entityId: newRegRef.id,
                         eventId: eventId,
-                        url: url
+                        url: adminUrl
                     });
 
                     // Send Push
                     await sendPushNotification(adminId, notifTitle, notifBody, {
-                        url: url,
+                        url: adminUrl,
                         eventId: eventId
                     });
                 });
@@ -283,15 +284,28 @@ const updateRegistrationStatus = async (req, res) => {
         }
         const registration = regDoc.data();
 
-        await db.collection('registrations').doc(id).update({ status });
+        let notifTitle; // Declare notifTitle here
+        let notifBody;  // Declare notifBody here
+
+        if (status === 'rejected') {
+            await db.collection('registrations').doc(id).update({
+                status: 'approved', // Revert to approved (Waiting for Payment) so they can re-upload
+                paymentScreenshotUrl: '', // Clear the invalid screenshot
+                rejectionReason: 'Payment Proof Rejected' // Optional: store reason
+            });
+            notifTitle = 'Payment Proof Rejected';
+            // Update the local variable to reflect the actual DB status for the notification message below
+            status = 'approved';
+        } else {
+            await db.collection('registrations').doc(id).update({ status });
+        }
 
         // Send Notification
-        let notifTitle = 'Registration Update';
-        if (status === 'approved') notifTitle = 'Registration Approved';
-        else if (status === 'confirmed') notifTitle = 'Registration Confirmed';
-        else if (status === 'rejected') notifTitle = 'Registration Rejected';
-
-        const notifBody = `Your registration for the event has been ${status.charAt(0).toUpperCase() + status.slice(1)}.`;
+        if (status === 'rejected') {
+            notifBody = `Your payment proof has been rejected. Please upload a valid screenshot to complete registration.`;
+        } else {
+            notifBody = `Your registration for the event has been ${status.charAt(0).toUpperCase() + status.slice(1)}.`;
+        }
 
         // Add to Firestore
         await db.collection('notifications').add({
@@ -309,9 +323,6 @@ const updateRegistrationStatus = async (req, res) => {
         // Send Push
         try {
             const { sendPushNotification } = require('../services/notificationService');
-            // Assuming registration document has eventId. 
-            // If not, we might need to fetch it or rely on entityId = registrationId which frontend can resolve.
-            // But having a direct URL is better.
             const url = `/events/${registration.eventId}`;
             await sendPushNotification(registration.userId, notifTitle, notifBody, {
                 url: url,

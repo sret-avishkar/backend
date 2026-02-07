@@ -49,7 +49,15 @@ const users = [
         displayName: 'V. Sravan Kumar',
         role: 'organizer',
         mobileNumber: '9030804427'
-    }
+    },
+    // {
+    //     email: 'muniravilla7@gmail.com',
+    //     password: 'Avishkar@2026',
+    //     displayName: 'Muni',
+    //     role: 'coordinator',
+    //     mobileNumber: '8074182938'
+    // }
+
 ];
 
 const seedUsers = async () => {
