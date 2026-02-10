@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { registerForEvent, getEventParticipants, getUserRegistrations } = require('../controllers/registrationController');
+const { registerForEvent, getEventParticipants, getUserRegistrations, spotRegister } = require('../controllers/registrationController');
 
 router.post('/', registerForEvent);
+router.post('/spot', spotRegister);
 router.get('/event/:eventId', getEventParticipants);
 router.get('/user/:userId', getUserRegistrations);
 router.get('/:id', require('../controllers/registrationController').getRegistrationById);

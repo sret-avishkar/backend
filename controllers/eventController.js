@@ -49,7 +49,8 @@ const createEvent = async (req, res) => {
             createdAt: new Date().toISOString(),
             enableMultiDepartment: req.body.enableMultiDepartment || false,
             departmentOrganizers: req.body.departmentOrganizers || {},
-            organizerIds: req.body.organizerIds || []
+            organizerIds: req.body.organizerIds || [],
+            registeredCount: 0
         };
         const docRef = await db.collection('events').add(newEvent);
         res.status(201).json({ id: docRef.id, ...newEvent });
@@ -90,7 +91,14 @@ const getEvents = async (req, res) => {
         }
 
         const snapshot = await query.get();
-        const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const events = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                registeredCount: data.registeredCount || 0
+            };
+        });
         res.status(200).json(events);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -103,14 +111,12 @@ const getEventById = async (req, res) => {
         if (!doc.exists) {
             return res.status(404).json({ error: 'Event not found' });
         }
-        const registrationsSnapshot = await db.collection('registrations')
-            .where('eventId', '==', req.params.id)
-            .get();
-
-        // Count registrations that are not rejected
-        const registeredCount = registrationsSnapshot.docs.filter(doc => doc.data().status !== 'rejected').length;
-
-        res.status(200).json({ id: doc.id, ...doc.data(), registeredCount });
+        const data = doc.data();
+        res.status(200).json({
+            id: doc.id,
+            ...data,
+            registeredCount: data.registeredCount || 0
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

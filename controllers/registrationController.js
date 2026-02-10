@@ -1,4 +1,4 @@
-const { db, admin } = require('../config/firebase');
+const { db, admin, auth } = require('../config/firebase');
 const { uploadToGitHub } = require('../services/githubService');
 
 const registerForEvent = async (req, res) => {
@@ -30,14 +30,9 @@ const registerForEvent = async (req, res) => {
 
         // Check for slots availability
         if (eventData.slots) {
-            const currentRegistrations = await registrationsRef
-                .where('eventId', '==', eventId)
-                .get();
-
-            // Filter out rejected registrations
-            const activeRegistrations = currentRegistrations.docs.filter(doc => doc.data().status !== 'rejected').length;
-
-            if (activeRegistrations >= eventData.slots) {
+            // Use the counter field instead of counting documents (O(1) vs O(N))
+            const currentCount = eventData.registeredCount || 0;
+            if (currentCount >= eventData.slots) {
                 return res.status(400).json({ message: 'Registration Full. Please contact the organizer for more seats.' });
             }
         }
@@ -88,6 +83,11 @@ const registerForEvent = async (req, res) => {
             paperStatus: initialPaperStatus,
             payLater: payLater || false, // Save payLater flag
             timestamp: new Date()
+        });
+
+        // Increment Registered Count on Event
+        await db.collection('events').doc(eventId).update({
+            registeredCount: admin.firestore.FieldValue.increment(1)
         });
 
         // Update User Profile with Mobile Number if provided
@@ -476,40 +476,44 @@ const updateRegistrationPaperStatus = async (req, res) => {
         });
 
         // Send Notification if status changes
-        if (currentData.paperStatus !== paperStatus) {
-            const notifTitle = paperStatus === 'accepted' ? 'Paper Accepted' : paperStatus === 'rejected' ? 'Paper Rejected' : 'Paper Update';
-            const notifBody = `Your paper status has been updated to ${paperStatus.toUpperCase()}.`;
+        try {
+            if (currentData.paperStatus !== paperStatus) {
+                const notifTitle = paperStatus === 'accepted' ? 'Paper Accepted' : paperStatus === 'rejected' ? 'Paper Rejected' : 'Paper Update';
+                const notifBody = `Your paper status has been updated to ${paperStatus.toUpperCase()}.`;
 
-            // Only notify if accepted or rejected (skip pending if strictly internal, but usually good to notify)
-            // If accepted, we might want to nudge them to pay.
-            let extraBody = "";
-            if (paperStatus === 'accepted') {
-                extraBody = " You can now proceed to payment.";
-            }
+                // Only notify if accepted or rejected (skip pending if strictly internal, but usually good to notify)
+                // If accepted, we might want to nudge them to pay.
+                let extraBody = "";
+                if (paperStatus === 'accepted') {
+                    extraBody = " You can now proceed to payment.";
+                }
 
-            await db.collection('notifications').add({
-                userId: currentData.userId,
-                title: notifTitle,
-                body: notifBody + extraBody,
-                read: false,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                type: 'paper_status',
-                entityId: id,
-                eventId: currentData.eventId,
-                url: `/events/${currentData.eventId}`
-            });
-
-            // Send Push
-            try {
-                const { sendPushNotification } = require('../services/notificationService');
-                const url = `/events/${currentData.eventId}`;
-                await sendPushNotification(currentData.userId, notifTitle, notifBody + extraBody, {
-                    url: url,
-                    eventId: currentData.eventId
+                await db.collection('notifications').add({
+                    userId: currentData.userId,
+                    title: notifTitle,
+                    body: notifBody + extraBody,
+                    read: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    type: 'paper_status',
+                    entityId: id,
+                    eventId: currentData.eventId,
+                    url: `/events/${currentData.eventId}`
                 });
-            } catch (err) {
-                console.error("Push failed for paper status", err);
+
+                // Send Push
+                try {
+                    const { sendPushNotification } = require('../services/notificationService');
+                    const url = `/events/${currentData.eventId}`;
+                    await sendPushNotification(currentData.userId, notifTitle, notifBody + extraBody, {
+                        url: url,
+                        eventId: currentData.eventId
+                    });
+                } catch (err) {
+                    console.error("Push failed for paper status", err);
+                }
             }
+        } catch (notifOverviewError) {
+            console.error("Notification failed but status updated:", notifOverviewError);
         }
 
         res.status(200).json({ message: 'Paper status updated successfully' });
@@ -519,6 +523,151 @@ const updateRegistrationPaperStatus = async (req, res) => {
     }
 };
 
+const spotRegister = async (req, res) => {
+    try {
+        const { eventId, name, email, mobile, college, rollNo, department, teamMembers, paid } = req.body;
+
+        if (!eventId || !name || !email || !mobile) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // 1. Check if User Exists
+        // 1. Check if User Exists
+        let userId = null;
+        let tempPassword = null;
+        try {
+            const userRecord = await auth.getUserByEmail(email);
+            userId = userRecord.uid;
+        } catch (error) {
+            if (error.code === 'auth/user-not-found') {
+                // 2. Create New User
+                try {
+                    tempPassword = `Avishkar@${new Date().getFullYear()}`;
+                    const newUser = await auth.createUser({
+                        email: email,
+                        password: tempPassword,
+                        displayName: name,
+                        phoneNumber: mobile.startsWith('+') ? mobile : undefined // Firebase requires E.164, skip if not formatted or just store in Firestore
+                    });
+                    userId = newUser.uid;
+
+                    // Create User Document in Firestore
+                    await db.collection('users').doc(userId).set({
+                        name,
+                        email,
+                        mobileNumber: mobile,
+                        college: college || '',
+                        rollNo: rollNo || '',
+                        department: department || '',
+                        role: 'participant',
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        isSpotRegistered: true
+                    });
+
+                    // Send Email with Credentials (TODO: Implement Email Service)
+                    // For now, we assume the admin gives them the credentials verbally or they use "Forgot Password"
+                    console.log(`[Spot Register] Created new user: ${email} / ${tempPassword}`);
+
+                } catch (createError) {
+                    console.error("Failed to create new user:", createError);
+                    return res.status(500).json({ error: 'Failed to create new user account' });
+                }
+            } else {
+                console.error("Auth Error:", error);
+                return res.status(500).json({ error: 'Authentication check failed' });
+            }
+        }
+
+        // 3. Register for Event
+        const registrationsRef = db.collection('registrations');
+
+        // Check duplicates
+        const snapshot = await registrationsRef
+            .where('userId', '==', userId)
+            .where('eventId', '==', eventId)
+            .get();
+
+        if (!snapshot.empty) {
+            return res.status(400).json({ message: 'User already registered for this event' });
+        }
+
+        const newReg = {
+            userId,
+            eventId,
+            mobile,
+            email,
+            name,
+            college: college || '',
+            rollNo: rollNo || '',
+            department: department || '',
+            teamMembers: teamMembers || [],
+            paymentScreenshotUrl: '', // Spot registration usually implies cash/direct payment
+            paperUrl: '',
+            status: paid ? 'approved' : 'pending',
+            paperStatus: 'na',
+            payLater: !paid,
+            isSpotRegistration: true,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        const newRegRef = await registrationsRef.add(newReg);
+
+        // Increment Registered Count on Event
+        await db.collection('events').doc(eventId).update({
+            registeredCount: admin.firestore.FieldValue.increment(1)
+        });
+
+        // 4. Notifications
+        // Notify Admin/Coordinator
+        try {
+            const { sendPushNotification } = require('../services/notificationService');
+            const eventDoc = await db.collection('events').doc(eventId).get();
+            const eventData = eventDoc.exists ? eventDoc.data() : { title: 'Event' };
+
+            const notifTitle = "New Spot Registration";
+            const notifBody = `${name} has been spot-registered for ${eventData.title}.`;
+            // Simplified notification logic, primarily logging here as Admin performed the action
+
+            // Notify the User (if they have app installed and logged in later)
+            await db.collection('notifications').add({
+                userId: userId,
+                title: `Registration Confirmed: ${eventData.title}`,
+                body: `You have been successfully registered for ${eventData.title}.`,
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                type: 'registration_status',
+                entityId: newRegRef.id,
+                eventId: eventId,
+                url: `/events/${eventId}`
+            });
+
+        } catch (notifWarn) {
+            console.warn("Notification warning:", notifWarn);
+        }
+
+        if (tempPassword) {
+            res.status(201).json({
+                message: 'Spot registration successful',
+                userId,
+                isNewUser: true,
+                tempPassword,
+                email
+            });
+        } else {
+            res.status(201).json({
+                message: 'Spot registration successful',
+                userId,
+                isNewUser: false
+            });
+        }
+
+    } catch (error) {
+        console.error("Spot Registration Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
 module.exports = {
     registerForEvent,
     getEventParticipants,
@@ -527,5 +676,6 @@ module.exports = {
     updateRegistrationStatus,
     checkRegistrationStatus,
     updateRegistrationPayment,
-    updateRegistrationPaperStatus
+    updateRegistrationPaperStatus,
+    spotRegister
 };
