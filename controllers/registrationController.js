@@ -304,6 +304,7 @@ const updateRegistrationStatus = async (req, res) => {
         if (status === 'rejected') {
             notifBody = `Your payment proof has been rejected. Please upload a valid screenshot to complete registration.`;
         } else {
+            notifTitle = `Registration ${status.charAt(0).toUpperCase() + status.slice(1)}`;
             notifBody = `Your registration for the event has been ${status.charAt(0).toUpperCase() + status.slice(1)}.`;
         }
 
@@ -668,6 +669,22 @@ const spotRegister = async (req, res) => {
 };
 
 
+
+const getUniqueUserCount = async (req, res) => {
+    try {
+        const snapshot = await db.collection('registrations').select('userId').get();
+        const uniqueUsers = new Set();
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.userId) uniqueUsers.add(data.userId);
+        });
+        res.status(200).json({ count: uniqueUsers.size });
+    } catch (error) {
+        console.error("Get Unique User Count Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     registerForEvent,
     getEventParticipants,
@@ -677,5 +694,6 @@ module.exports = {
     checkRegistrationStatus,
     updateRegistrationPayment,
     updateRegistrationPaperStatus,
-    spotRegister
+    spotRegister,
+    getUniqueUserCount
 };

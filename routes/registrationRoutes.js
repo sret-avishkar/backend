@@ -11,5 +11,6 @@ router.get('/check/:eventId/:userId', require('../controllers/registrationContro
 router.put('/:id/status', require('../controllers/registrationController').updateRegistrationStatus);
 router.put('/:id/payment', require('../controllers/registrationController').updateRegistrationPayment);
 router.put('/:id/paper-status', require('../controllers/registrationController').updateRegistrationPaperStatus);
+router.get('/stats/unique-users', require('../controllers/registrationController').getUniqueUserCount);
 
 module.exports = router;
